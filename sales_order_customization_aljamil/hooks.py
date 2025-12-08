@@ -51,7 +51,7 @@ doctype_js = {
 		"public/js/available_percentage.js",
 		"public/js/available_qty.js",
 		"public/js/contract_discount.js",
-		"public/js/custom_items_table.js",
+		# "public/js/custom_items_table.js",  # تم تعطيله مؤقتاً - لا يمكن وضع تعليق داخل القائمة
 		"public/js/deductible_amount.js",
 		"public/js/delete_row.js",
 		"public/js/discount2_1.js",
@@ -66,6 +66,7 @@ doctype_js = {
 		"public/js/from_so_to_inv.js",
 		"public/js/items_available.js",
 		"public/js/mode_of_payment_account.js",
+		"public/js/multi_add_button.js",
 		"public/js/order_type.js",
 		"public/js/outstanding.js",
 		"public/js/payment_schedule.js",
