@@ -44,6 +44,50 @@ app_license = "mit"
 
 # include js in doctype views
 # doctype_js = {"doctype" : "public/js/doctype.js"}
+doctype_js = {
+	"Sales Order": [
+		"public/js/add_row.js",
+		"public/js/approval_amount_limit.js",
+		"public/js/available_percentage.js",
+		"public/js/available_qty.js",
+		"public/js/contract_discount.js",
+		"public/js/custom_items_table.js",
+		"public/js/deductible_amount.js",
+		"public/js/delete_row.js",
+		"public/js/discount2_1.js",
+		"public/js/discount2_2.js",
+		"public/js/discount2.js",
+		"public/js/discount_amount_emp2.js",
+		"public/js/discount_amount.js",
+		"public/js/discount_limit.js",
+		"public/js/discount_percentage.js",
+		"public/js/discount_percentage_so.js",
+		"public/js/from_so_table_to_inv_table.js",
+		"public/js/from_so_to_inv.js",
+		"public/js/items_available.js",
+		"public/js/mode_of_payment_account.js",
+		"public/js/order_type.js",
+		"public/js/outstanding.js",
+		"public/js/payment_schedule.js",
+		"public/js/projected_qty2.js",
+		"public/js/request_for_quotation.js",
+		"public/js/reservation.js",
+		"public/js/reserved_qty.js",
+		"public/js/sales_order2.js",
+		"public/js/sales_order_3.js",
+		"public/js/sales_order_insurance_data.js",
+		"public/js/sales_order_script.js",
+		"public/js/search_in_old_eye_examination.js",
+		"public/js/sms2.js",
+		"public/js/stock_entry.js",
+		"public/js/stock_table_so.js",
+		"public/js/tolal_items_discount.js",
+		"public/js/total_deduction.js",
+		"public/js/total_insurance.js",
+		"public/js/total_price_list_rate.js",
+	]
+}
+
 # doctype_list_js = {"doctype" : "public/js/doctype_list.js"}
 # doctype_tree_js = {"doctype" : "public/js/doctype_tree.js"}
 # doctype_calendar_js = {"doctype" : "public/js/doctype_calendar.js"}
