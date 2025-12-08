@@ -76,33 +76,28 @@ frappe.ui.form.on("Sales Order", {
     refresh(frm) {
         if (!frm.fields_dict.custom_items_table) return;
         setup_custom_items_table(frm);
-        load_items_into_custom_table(frm);
+        // لا نحمّل البيانات من الجدول الأصلي - الجدول المخصص هو المصدر الوحيد
+        // فقط نتأكد من أن الجدول المخصص موجود وجاهز
         ensure_custom_items_observer(frm);
         
         // Customize items child table appearance
         customize_items_table_appearance(frm);
     },
     before_save(frm) {
-        // Sync with refresh in before_save to ensure child table is updated before save
+        // فقط المزامنة من الجدول المخصص إلى الجدول الأصلي قبل الحفظ
         sync_custom_items_to_child_table(frm, false);
-    },
-    items_add(frm) {
-        if (!frm.doc.customer) {
-            frappe.msgprint({ message: __("Please select Customer first"), indicator: "red" });
-            if (Array.isArray(frm.doc.items)) {
-                frm.doc.items.pop();
+        // بعد المزامنة، نحدث refresh_field مرة واحدة فقط
+        setTimeout(() => {
+            if (!frm._custom_items_loading) {
+                frm._custom_items_loading = true;
                 frm.refresh_field("items");
+                setTimeout(() => {
+                    frm._custom_items_loading = false;
+                }, 200);
             }
-            return;
-        }
-        const last = (frm.doc.items || [])[frm.doc.items.length - 1];
-        if (last) {
-            if (!last.warehouse && frm.doc.set_warehouse) last.warehouse = frm.doc.set_warehouse;
-            if (!last.delivery_date) last.delivery_date = frm.doc.delivery_date || frm.doc.transaction_date || frappe.datetime.get_today();
-        }
-        frm.refresh_field("items");
-        load_items_into_custom_table(frm);
+        }, 50);
     }
+    // تم إزالة items_add - الجدول المخصص هو المصدر الوحيد
 });
 
 // Customize items child table appearance
@@ -200,8 +195,8 @@ function ensure_custom_items_observer(frm) {
         const w = frm.fields_dict.custom_items_table && frm.fields_dict.custom_items_table.$wrapper;
         if (!w || !w.length) return;
         if (!w.find('.custom-items-body').length) {
+            // فقط نعيد إعداد الجدول بدون تحميل البيانات
             setup_custom_items_table(frm);
-            load_items_into_custom_table(frm);
         }
     });
     obs.observe(target, { childList: true, subtree: true });
@@ -223,14 +218,19 @@ function setup_custom_items_table(frm) {
         // Add Row
     $(frm.wrapper).on("click", ".add-custom-row", function () {
         // أنشئ صف في جدول النظام أولاً ليكون الميرور دائمًا مطابق
+        if (frm._custom_items_loading) {
+            console.log("[Add Row] Skipping - already loading");
+            return;
+        }
         const child = frm.add_child("items");
         child.qty = 1;
         if (frm.doc.set_warehouse) child.warehouse = frm.doc.set_warehouse;
         child.delivery_date = frm.doc.delivery_date || frm.doc.transaction_date || frappe.datetime.nowdate();
-        frm.refresh_field("items");
-        if (!frm._custom_items_loading) {
-            load_items_into_custom_table(frm);
-        }
+        // Don't refresh field - it will trigger events that reload the table
+        // Instead, directly add a blank row to the custom table
+        const wrapper = frm.fields_dict.custom_items_table.$wrapper;
+        add_custom_row(frm, wrapper);
+        update_totals(wrapper);
     });
 
         // Remove Row
@@ -381,6 +381,9 @@ function setup_item_link_control(frm, row, default_item_code) {
     const parent = row.find('[data-col="item_code"]').empty()[0];
     console.log("[Setup Item Control] Parent element", { parent_exists: !!parent });
 
+    // Flag to track if we're setting default value (to prevent triggering change event)
+    let is_setting_default = false;
+
     const control = frappe.ui.form.make_control({
         parent: parent,
         df: {
@@ -389,6 +392,15 @@ function setup_item_link_control(frm, row, default_item_code) {
             options: "Item",
             placeholder: "Item Code",
             change: function () {
+                // Skip change event if we're setting default value or loading items
+                if (is_setting_default || frm._custom_items_loading) {
+                    console.log("[Item Control] Change event skipped - setting default or loading", { 
+                        is_setting_default, 
+                        loading: frm._custom_items_loading 
+                    });
+                    return;
+                }
+
                 const item_code = control.get_value();
                 console.log("[Item Control] Change event", { item_code });
                 if (!item_code) {
@@ -476,6 +488,7 @@ function setup_item_link_control(frm, row, default_item_code) {
     // Set value from existing item and fetch item details
     if (default_item_code) {
         console.log("[Setup Item Control] Setting default item_code", { default_item_code });
+        is_setting_default = true;
         setTimeout(() => {
             control.set_value(default_item_code);
             console.log("[Setup Item Control] Value set, fetching details...");
@@ -531,10 +544,13 @@ function setup_item_link_control(frm, row, default_item_code) {
                             } else {
                                 console.log("[Setup Item Control] No item data returned");
                             }
+                            // Reset flag after details are fetched
+                            is_setting_default = false;
                         }
                     });
                 } else {
                     console.log("[Setup Item Control] No item_code in control");
+                    is_setting_default = false;
                 }
             }, 200);
         }, 100);
@@ -605,8 +621,15 @@ function sync_custom_items_to_child_table(frm, skip_refresh = false) {
     const rows_count = rows.length;
     console.log("[Sync] Rows in custom table", rows_count);
 
+    // إذا لم يكن هناك صفوف، نفرّغ الجدول الأصلي فقط
     if (rows_count === 0) {
-        console.log("[Sync] No rows to sync");
+        console.log("[Sync] No rows in custom table → clearing child table");
+        frappe.model.clear_table(frm.doc, "items");
+        console.log("[Sync] Child table cleared");
+        // Reset syncing flag
+        frm._custom_items_syncing = false;
+        // لا نحدث refresh_field هنا لأن هذا قد يسبب استدعاء validate/before_save تلقائياً
+        // التحديث سيحدث فقط عند الحفظ في before_save
         return;
     }
 
@@ -626,7 +649,13 @@ function sync_custom_items_to_child_table(frm, skip_refresh = false) {
         if (code && code.trim() !== "") { has_any_item = true; }
     });
     if (!has_any_item) {
-        console.log("[Sync] No item_code present in any row → skip clearing and syncing");
+        console.log("[Sync] No item_code present in any row → clearing child table");
+        frappe.model.clear_table(frm.doc, "items");
+        console.log("[Sync] Child table cleared");
+        // Reset syncing flag
+        frm._custom_items_syncing = false;
+        // لا نحدث refresh_field هنا لأن هذا قد يسبب استدعاء validate/before_save تلقائياً
+        // التحديث سيحدث فقط عند الحفظ في before_save
         return;
     }
 
@@ -717,24 +746,25 @@ function sync_custom_items_to_child_table(frm, skip_refresh = false) {
     
     console.log("[Sync] Total rows synced", synced_count);
 
-    // Only refresh items field if skip_refresh is false (i.e., called from before_save)
-    // frm.refresh_field("items") causes load_items_into_custom_table which causes sync again
-    if (!skip_refresh && !frm._custom_items_loading && synced_count > 0) {
-        // Use setTimeout to break the synchronous call chain
-        setTimeout(() => {
-            frm.refresh_field("items");
-            if (frm.doc.docstatus === 0 && frm.script_manager) {
-                frm.trigger("calculate_taxes_and_totals");
-            }
-            // Reset syncing flag after a delay
+    // فقط عند الحفظ (before_save) نحدث refresh_field
+    // لا نحدث refresh_field هنا لتجنب استدعاء validate/before_save تلقائياً
+    if (!skip_refresh && synced_count > 0) {
+        // فقط نحدث calculate_taxes_and_totals بدون refresh_field
+        // refresh_field سيحدث تلقائياً عند الحفظ من Frappe
+        if (frm.doc.docstatus === 0 && frm.script_manager) {
+            // استخدم setTimeout لتأخير الاستدعاء وتجنب الحلقات
             setTimeout(() => {
-                frm._custom_items_syncing = false;
-            }, 200);
-        }, 100);
-    } else {
-        // Reset syncing flag immediately if we didn't sync or if skip_refresh is true
-        frm._custom_items_syncing = false;
+                try {
+                    frm.trigger("calculate_taxes_and_totals");
+                } catch(e) {
+                    console.log("[Sync] Error triggering calculate_taxes_and_totals", e);
+                }
+            }, 100);
+        }
     }
+    
+    // Reset syncing flag
+    frm._custom_items_syncing = false;
 }
 
 // Multi Add dialog
@@ -937,40 +967,6 @@ function is_column_visible(wrapper, fieldname) {
     if (!el.length) return false;
     return el.is(":visible") && el.css("display") !== "none";
 }
-frappe.ui.form.on("Sales Order Item", {
-    item_code(frm, cdt, cdn) {
-        // Skip if we're syncing to avoid infinite loop
-        if (frm._custom_items_syncing || frm._custom_items_loading) return;
-        
-        if (!frm.doc.customer) {
-            frappe.msgprint({ message: __("Please select Customer first"), indicator: "red" });
-            frappe.model.set_value(cdt, cdn, "item_code", "");
-            return;
-        }
-        const wh = frm.doc.set_warehouse || "";
-        if (wh) {
-            const current = frappe.model.get_value(cdt, cdn, "warehouse");
-            if (!current) frappe.model.set_value(cdt, cdn, "warehouse", wh);
-        }
-        const dd = frm.doc.delivery_date || frm.doc.transaction_date || frappe.datetime.nowdate();
-        const curdd = frappe.model.get_value(cdt, cdn, "delivery_date");
-        if (!curdd) frappe.model.set_value(cdt, cdn, "delivery_date", dd);
-        load_items_into_custom_table(frm);
-    },
-    qty(frm, cdt, cdn) { 
-        // Skip if we're syncing to avoid infinite loop
-        if (frm._custom_items_syncing || frm._custom_items_loading) return;
-        load_items_into_custom_table(frm); 
-    },
-    rate(frm, cdt, cdn) { 
-        // Skip if we're syncing to avoid infinite loop
-        if (frm._custom_items_syncing || frm._custom_items_loading) return;
-        load_items_into_custom_table(frm); 
-    },
-    warehouse(frm, cdt, cdn) { 
-        // Skip if we're syncing to avoid infinite loop
-        if (frm._custom_items_syncing || frm._custom_items_loading) return;
-        load_items_into_custom_table(frm); 
-    }
-});
+// تم إزالة أحداث Sales Order Item
+// الجدول المخصص هو المصدر الوحيد، والجدول الأصلي يتم تحديثه فقط عند الحفظ
 
