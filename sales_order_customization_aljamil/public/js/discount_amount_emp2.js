@@ -58,6 +58,13 @@ frappe.ui.form.on('Sales Order', {
 
         // ✅ إذا فارغ أو صفر → إعادة كل الخصومات في الجدول للصفر
         if (!total_discount || total_discount === 0) {
+            // إذا كان هناك جدول مخصص، لا نتعامل مع التحديثات من الجدول الأصلي
+            if (frm.fields_dict.custom_items_table) {
+                // في الجدول المخصص، التحديثات تتم مباشرة على الحقول
+                // لا نحتاج refresh_field لأن الجدول المخصص يزامن عند الحفظ فقط
+                return;
+            }
+            
             frm.doc.items.forEach(row => {
                 frappe.model.set_value(row.doctype, row.name, 'custom_discount', 0);
                 row._original_custom_discount = 0;
@@ -141,7 +148,10 @@ function distribute_discount(frm, total_discount) {
         });
     }
 
-    frm.refresh_field('items');
+    // إذا كان هناك جدول مخصص، لا نستخدم refresh_field لأن التحديثات تتم مباشرة
+    if (!frm.fields_dict.custom_items_table) {
+        frm.refresh_field('items');
+    }
     validate_total_discount(frm);
 }
 
