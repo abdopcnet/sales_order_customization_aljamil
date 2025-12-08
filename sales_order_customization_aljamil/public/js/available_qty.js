@@ -4,18 +4,35 @@
 
 frappe.ui.form.on('Sales Order Item', {
     item_code(frm, cdt, cdn) {
+        // إذا كان هناك جدول مخصص، لا نتعامل مع التحديثات من الجدول الأصلي
+        if (frm.fields_dict.custom_items_table) {
+            return; // الجدول المخصص يتعامل مع التحديثات
+        }
         update_available_qty_strict(frm, cdt, cdn);
     },
     warehouse(frm, cdt, cdn) {
+        // إذا كان هناك جدول مخصص، لا نتعامل مع التحديثات من الجدول الأصلي
+        if (frm.fields_dict.custom_items_table) {
+            return; // الجدول المخصص يتعامل مع التحديثات
+        }
         update_available_qty_strict(frm, cdt, cdn);
     },
     qty(frm, cdt, cdn) {
+        // إذا كان هناك جدول مخصص، لا نتعامل مع التحديثات من الجدول الأصلي
+        if (frm.fields_dict.custom_items_table) {
+            return; // الجدول المخصص يتعامل مع التحديثات
+        }
         update_available_qty_strict(frm, cdt, cdn);
     }
 });
 
 frappe.ui.form.on('Sales Order', {
     refresh(frm) {
+        // إذا كان هناك جدول مخصص، لا نتعامل مع التحديثات من الجدول الأصلي
+        if (frm.fields_dict.custom_items_table) {
+            return; // الجدول المخصص يتعامل مع التحديثات
+        }
+        
         if (frm.doc.docstatus === 0) {
             (frm.doc.items || []).forEach(d => {
                 update_available_qty_strict(frm, d.doctype, d.name);
@@ -24,6 +41,11 @@ frappe.ui.form.on('Sales Order', {
     },
     onload_post_render(frm) {
         // ✅ اشترك في التحديثات اللحظية لرصيد المخزن
+        // إذا كان هناك جدول مخصص، لا نتعامل مع التحديثات من الجدول الأصلي
+        if (frm.fields_dict.custom_items_table) {
+            return; // الجدول المخصص يتعامل مع التحديثات
+        }
+        
         frappe.realtime.on("bin_update", (data) => {
             (frm.doc.items || []).forEach(d => {
                 if (d.item_code === data.item_code && d.warehouse === data.warehouse) {
@@ -40,6 +62,11 @@ frappe.ui.form.on('Sales Order', {
 // 🔎 دالة لحساب الرصيد المتاح
 // =======================
 function update_available_qty_strict(frm, cdt, cdn) {
+    // إذا كان هناك جدول مخصص، لا نتعامل مع التحديثات من الجدول الأصلي
+    if (frm.fields_dict.custom_items_table) {
+        return; // الجدول المخصص يتعامل مع التحديثات
+    }
+    
     let row = locals[cdt][cdn];
 
     if (row.item_code && row.warehouse) {
