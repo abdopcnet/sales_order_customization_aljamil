@@ -280,7 +280,10 @@ function create_stock_entry(frm, row, from_warehouse, dialog) {
                                     frappe.model.set_value(row.doctype, row.name, 'custom_stock_entry_deducted', 1);
                                 }
 
-                                frm.refresh_field('items');
+                                // إذا كان هناك جدول مخصص، لا نستخدم refresh_field لأن التحديثات تتم مباشرة
+                                if (!frm.fields_dict.custom_items_table) {
+                                    frm.refresh_field('items');
+                                }
                                 frappe.msgprint(__('تم إنشاء قيد مخزني مسجل: {0}', [entry_no]));
 
                                 if (dialog) dialog.$wrapper.find(`tr[data-warehouse="${from_warehouse}"] .stock-entry-no`).html(`<a href="/app/stock-entry/${entry_no}">${entry_no}</a>`);
