@@ -17,7 +17,7 @@ frappe.ui.form.on("Sales Order", {
         // Add Multi Add button below the native items table
         // This button is independent and always shows for native items table
         if (!frm._multi_add_button_added) {
-            grid.add_custom_button(__("Multi Add Items"), function() {
+            grid.add_custom_button(__("📦 Multi Add Items"), function() {
                 open_multi_add_dialog_for_native_table(frm);
             }, "bottom");
             frm._multi_add_button_added = true;
