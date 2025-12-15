@@ -51,7 +51,6 @@ doctype_js = {
 		"public/js/available_percentage.js",
 		"public/js/available_qty.js",
 		"public/js/contract_discount.js",
-		# "public/js/custom_items_table.js",  # تم تعطيله مؤقتاً - لا يمكن وضع تعليق داخل القائمة
 		"public/js/deductible_amount.js",
 		"public/js/delete_row.js",
 		"public/js/discount2_1.js",
