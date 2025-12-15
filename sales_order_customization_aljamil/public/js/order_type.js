@@ -1,15 +1,13 @@
 frappe.ui.form.on('Sales Order', {
-    onload: function(frm) {
-        if (frm.doc.order_type) {
-            frm.set_df_property('order_type', 'read_only', 1);
-        } else {
-            frm.set_df_property('order_type', 'read_only', 0);
-        }
+    refresh: function(frm) {
+        // Update selling price list from order_type on refresh
+        frm.doc.selling_price_list = frm.doc.order_type;
+        frm.refresh_field('selling_price_list');
     },
+
     order_type: function(frm) {
-        if (frm.doc.order_type) {
-            frm.set_df_property('order_type', 'read_only', 1);
-        }
+        // Update selling price list whenever order_type changes
+        frm.set_value('selling_price_list', frm.doc.order_type);
     }
 });
 
