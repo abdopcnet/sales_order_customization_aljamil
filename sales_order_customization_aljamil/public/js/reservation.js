@@ -8,7 +8,7 @@ frappe.ui.form.on('Sales Order Item', {
             .then(r => {
                 let is_sub = r.message.is_sub_contracted_item;
 
-                // فعل الحجز فقط إذا لم يكن الصنف يصنع عند الغير
+                // Enable reservation only if item is not subcontracted
                 frappe.model.set_value(cdt, cdn, 'reserve_stock', !is_sub);
             });
     }
