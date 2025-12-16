@@ -1,6 +1,6 @@
 frappe.ui.form.on('Sales Order', {
     onload(frm) {
-        // جعل الحقول قراءة فقط عند تحميل الفورم
+        // Make fields read-only when form loads
         frm.set_df_property('custom_customer_amount', 'read_only', 1);
         frm.set_df_property('custom_company_amount', 'read_only', 1);
         frm.set_df_property('custom_total_insurance', 'read_only', 1);
