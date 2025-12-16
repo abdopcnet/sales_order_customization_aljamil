@@ -4,7 +4,7 @@ frappe.ui.form.on('Sales Order', {
             let messages = [];
             let branch = frm.doc.branch || "غير محدد";
 
-            // اجمع كل الأصناف ذات الخصم غير المعتمد
+            // Collect all items with unapproved discount
             (frm.doc.items || []).forEach(item => {
                 if (item.custom_discount2 > 0 && !item.custom_discount2_approved) {
                     let subject = `👓️ خصم ${format_currency(item.custom_discount2, "SAR")} ريال يتطلب الموافقة\n` +
@@ -20,7 +20,7 @@ frappe.ui.form.on('Sales Order', {
                 return;
             }
 
-            // اجلب قائمة الموظفين النشطين
+            // Get list of active employees
             frappe.db.get_list('Employee', {
                 fields: ['name', 'employee_name'],
                 filters: { status: 'Active' },
@@ -40,7 +40,7 @@ frappe.ui.form.on('Sales Order', {
                         reqd: 1
                     }
                 ], function(values) {
-                    // بعد اختيار الموظف، اجلب رقم الهاتف الخاص به
+                    // After selecting employee, get their phone number
                     frappe.db.get_value('Employee', values.employee, 'cell_number').then(res => {
                         const phone = res.message.cell_number;
                         if (!phone) {
