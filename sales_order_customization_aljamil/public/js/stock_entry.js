@@ -4,7 +4,7 @@ frappe.ui.form.on('Sales Order', {
         if (!frm.doc.custom_quotation) return;
 
         try {
-            // الحصول على أحدث نسخة من المستند
+            // Get latest version of document
             await frm.refresh();
             
             const quotation = await frappe.db.get_doc('Quotation', frm.doc.custom_quotation);
@@ -17,7 +17,7 @@ frappe.ui.form.on('Sales Order', {
                 return;
             }
 
-            // الحصول على الكميات المتاحة
+            // Get available quantities
             const bin_data = await frappe.db.get_list("Bin", {
                 filters: {
                     warehouse: target_warehouse,
@@ -33,7 +33,7 @@ frappe.ui.form.on('Sales Order', {
                 available_map[b.item_code] = actual - reserved;
             });
 
-            // حساب إجمالي الكمية المطلوبة
+            // Calculate total required quantity
             const total_required = {};
             (quotation.items || []).forEach(item => {
                 if (item.warehouse && item.warehouse !== target_warehouse) {
@@ -41,14 +41,14 @@ frappe.ui.form.on('Sales Order', {
                 }
             });
 
-            // حساب العجز المتبقي
+            // Calculate remaining shortage
             const shortage_map = {};
             Object.keys(total_required).forEach(item_code => {
                 const available = available_map[item_code] || 0;
                 shortage_map[item_code] = Math.max(total_required[item_code] - available, 0);
             });
 
-            // توزيع العجز على المخازن
+            // Distribute shortage across warehouses
             const warehouse_groups = {};
             (quotation.items || []).forEach(item => {
                 if (item.warehouse && item.warehouse !== target_warehouse) {
@@ -74,7 +74,7 @@ frappe.ui.form.on('Sales Order', {
                 return;
             }
 
-            // إنشاء سندات التحويل
+            // Create transfer entries
             for (const from_warehouse of warehouses) {
                 const warehouse_info = await frappe.db.get_value("Warehouse", from_warehouse, "default_in_transit_warehouse");
                 
@@ -85,7 +85,7 @@ frappe.ui.form.on('Sales Order', {
                 const transit_warehouse = warehouse_info.message.default_in_transit_warehouse;
                 const items = warehouse_groups[from_warehouse];
 
-                // إنشاء سند التحويل
+                // Create transfer entry
                 const se_doc = await frappe.call({
                     method: "frappe.client.insert",
                     args: {
@@ -110,7 +110,7 @@ frappe.ui.form.on('Sales Order', {
                     }
                 });
 
-                // إرسال سند التحويل
+                // Submit transfer entry
                 const submitted_se = await frappe.call({
                     method: "frappe.client.submit",
                     args: { doc: se_doc.message }
@@ -118,7 +118,7 @@ frappe.ui.form.on('Sales Order', {
 
                 const se_name = submitted_se.message.name;
 
-                // تحديث Sales Order Items
+                // Update Sales Order Items
                 for (const row of frm.doc.items || []) {
                     const matched_item = items.find(i => i.item_code === row.item_code);
                     if (matched_item) {
@@ -126,7 +126,7 @@ frappe.ui.form.on('Sales Order', {
                     }
                 }
 
-                // تحديث حالة عرض السعر
+                // Update Quotation status
                 await frappe.call({
                     method: "frappe.client.set_value",
                     args: {
@@ -143,7 +143,7 @@ frappe.ui.form.on('Sales Order', {
                 });
             }
             
-            // تحديث النموذج للحصول على أحدث التغييرات
+            // Refresh form to get latest changes
             await frm.refresh();
             
         } catch (error) {
