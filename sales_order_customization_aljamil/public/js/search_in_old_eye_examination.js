@@ -29,7 +29,7 @@ frappe.ui.form.on('Sales Order', {
                     frm.refresh_field("custom_size");
 
                     if (found) {
-                        // جدول للقراءة فقط
+                        // Table is read-only
                         frm.fields_dict["custom_size"].grid.df.cannot_add_rows = true;
                         frm.fields_dict["custom_size"].grid.df.cannot_delete_rows = true;
                         frm.fields_dict["custom_size"].grid.df.read_only = true;
@@ -38,7 +38,7 @@ frappe.ui.form.on('Sales Order', {
                 }
             });
         } else {
-            // عند حذف التاريخ، تفريغ الجدول وجعله قابل للتعديل مع تحديث فوري
+            // When deleting date, clear table and make it editable with immediate update
             frm.clear_table("custom_size");
             frm.refresh_field("custom_size");
 
