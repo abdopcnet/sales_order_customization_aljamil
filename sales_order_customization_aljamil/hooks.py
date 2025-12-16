@@ -56,6 +56,7 @@ doctype_js = {
 		"public/js/discount2_1.js",
 		"public/js/discount2_2.js",
 		"public/js/discount2.js",
+        "public/js/payment_entry.js",
 		"public/js/discount_amount_emp2.js",
 		"public/js/discount_amount.js",
 		"public/js/discount_limit.js",
