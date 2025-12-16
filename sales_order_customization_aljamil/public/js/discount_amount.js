@@ -2,7 +2,7 @@ frappe.ui.form.on('Sales Order', {
     before_load: function(frm) {
         frm.employee = null;
         frm.custom_sales_limit = 0;
-        frm._shown_employee_error = false; // نعيد ضبط الفلاغ عند كل تحميل
+        frm._shown_employee_error = false; // Reset flag on each load
     },
 
     onload: async function(frm) {
@@ -40,7 +40,7 @@ frappe.ui.form.on('Sales Order', {
             if (grid) {
                 const df = grid.get_field('custom_discount');
                 if (df && df.df) {
-                    df.df.read_only = 1;  // منع التعديل من الواجهة
+                    df.df.read_only = 1;  // Prevent editing from UI
                     df.refresh();
                 } else {
                     console.warn("الحقل custom_discount غير موجود في جدول items");
@@ -56,7 +56,7 @@ frappe.ui.form.on('Sales Order Item', {
     custom_discount: function(frm, cdt, cdn) {
         const row = locals[cdt][cdn];
 
-        // لا يوجد موظف نشط: نمنع التعديل ونرجع القيمة فورًا
+        // No active employee: prevent editing and revert value immediately
         if (!frm.employee) {
             if (!frm._shown_employee_error) {
                 frm._shown_employee_error = true;
@@ -71,7 +71,7 @@ frappe.ui.form.on('Sales Order Item', {
             return false;
         }
 
-        // تجاوز الحد المسموح
+        // Exceeded allowed limit
         if (row.custom_discount > frm.custom_sales_limit) {
             frappe.msgprint({
                 title: "خطأ",
@@ -83,7 +83,7 @@ frappe.ui.form.on('Sales Order Item', {
             return false;
         }
 
-        // تحديث القيمة الأصلية عند تعديل صحيح
+        // Update original value when edit is valid
         row._original_custom_discount = row.custom_discount;
     },
 
