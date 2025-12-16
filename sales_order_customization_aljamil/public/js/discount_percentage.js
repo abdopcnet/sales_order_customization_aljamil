@@ -8,16 +8,16 @@ frappe.ui.form.on('Sales Order Item', {
 function update_discount(frm, cdt, cdn) {
     let row = locals[cdt][cdn];
 
-    // حساب نسبة الخصم من السعر
+    // Calculate discount percentage from price
     let base_discount = 0;
     if (row.price_list_rate && row.custom_discount_percentage) {
         base_discount = (row.price_list_rate * row.custom_discount_percentage) / 100;
     }
 
-    // جمع الخصومات فقط وكتابة الناتج
+    // Sum discounts only and write result
     let total_discount = (row.custom_discount || 0) + (row.custom_discount2 || 0) + base_discount;
 
-    // كتابة الناتج في الحقل، كأن المستخدم كتبه يدويًا
+    // Write result to field, as if user wrote it manually
     frappe.model.set_value(cdt, cdn, "discount_amount", total_discount);
 }
 
