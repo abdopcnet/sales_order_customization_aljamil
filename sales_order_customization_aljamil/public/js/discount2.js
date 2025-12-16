@@ -39,11 +39,11 @@ frappe.ui.form.on('Sales Order', {
     },
 
     refresh(frm) {
-        // لا تحقق من الكود أو الموافقة
+        // Do not check code or approval
     },
 
     before_submit(frm) {
-        // لا تحقق من الكود أو الموافقة
+        // Do not check code or approval
     }
 });
 
@@ -72,7 +72,7 @@ frappe.ui.form.on('Sales Order Item', {
     },
 
     custom_discount_code_approved(frm, cdt, cdn) {
-        // لا شيء هنا أيضًا
+        // Nothing here either
     },
 
     items_add(frm, cdt, cdn) {
@@ -82,7 +82,7 @@ frappe.ui.form.on('Sales Order Item', {
     }
 });
 
-// توليد كود عشوائي فقط
+// Generate random code only
 function generateRandomCode(length) {
     const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
     let result = '';
