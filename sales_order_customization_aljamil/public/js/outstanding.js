@@ -3,24 +3,28 @@ frappe.ui.form.on('Sales Order', {
 		update_custom_outstanding(frm);
 	},
 	refresh: function (frm) {
-		update_custom_outstanding(frm);
+		// Only update in refresh if document is already dirty or is new
+		// This prevents marking clean documents as dirty
+		if (frm.is_dirty() || frm.doc.__islocal) {
+			update_custom_outstanding(frm);
+		}
 	},
 	validate: function (frm) {
 		update_custom_outstanding(frm);
 	},
 	after_save: function (frm) {
-		// تحديث الحقل بعد الحفظ مباشرة بدون الحاجة لزر تحديث
+		// Update field immediately after save without needing refresh button
 		if (!frm._outstanding_updated) {
 			update_custom_outstanding(frm);
 			frm._outstanding_updated = true;
 
-			// نخزن التعديل مباشرة في قاعدة البيانات
+			// Store the change directly in database
 			frappe.db
 				.set_value('Sales Order', frm.doc.name, {
 					custom_outstanding_amount: frm.doc.custom_outstanding_amount,
 				})
 				.then(() => {
-					frm.reload_doc(); // يعمل رفرش للفورم بعد الحفظ
+					frm.reload_doc(); // Refresh form after save
 					frm._outstanding_updated = false;
 				});
 		}
@@ -56,6 +60,13 @@ function update_custom_outstanding(frm) {
 	// Only update if value has changed to prevent marking document as dirty
 	let current_value = parseInt(frm.doc.custom_outstanding_amount || 0);
 	if (current_value !== total) {
-		frm.set_value('custom_outstanding_amount', total);
+		// Use frappe.model.set_value to avoid triggering dirty state unnecessarily
+		// Only if document is already dirty or new
+		if (frm.is_dirty() || frm.doc.__islocal) {
+			frm.set_value('custom_outstanding_amount', total);
+		} else {
+			// For clean documents, update silently without marking as dirty
+			frm.doc.custom_outstanding_amount = total;
+		}
 	}
 }
