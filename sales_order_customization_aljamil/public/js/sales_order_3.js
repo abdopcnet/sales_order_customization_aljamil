@@ -3,12 +3,12 @@ frappe.ui.form.on('Sales Order', {
         let errors = [];
 
         for (let row of frm.doc.custom_payment) {
-            // تحقق إذا كانت طريقة الدفع موجودة والمبلغ غير موجود
+            // Check if payment method exists and amount is missing
             if (row.mode_of_payment && (!row.amount || row.amount === 0)) {
                 errors.push(__(`السطر #{0}: عند تحديد طريقة الدفع يجب إدخال المبلغ.`, [row.idx]));
             }
 
-            // تحقق إذا كان المبلغ موجود وطريقة الدفع غير موجودة
+            // Check if amount exists and payment method is missing
             if (row.amount && (!row.mode_of_payment || row.mode_of_payment.trim() === '')) {
                 errors.push(__(`السطر #{0}: عند إدخال المبلغ يجب تحديد طريقة الدفع.`, [row.idx]));
             }
