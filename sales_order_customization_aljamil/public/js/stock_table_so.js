@@ -56,7 +56,7 @@ function init_strict_colors(frm) {
 // Iterates through all existing rows and applies color coding
 // =======================
 function apply_strict_colors(frm) {
-	if (frm.doc.docstatus !== 0) return;
+	// Removed docstatus check to allow script to run even when docstatus is 0
 	inject_strict_css();
 
 	if (frm.fields_dict['items']) {
@@ -139,10 +139,9 @@ function inject_strict_css() {
 // =======================
 // Open stock dialog showing warehouse balances
 // Displays available stock in all warehouses for the selected item
+// Works in any document status (draft, submitted, cancelled)
 // =======================
 function open_stock_dialog(frm, grid_row) {
-	if (frm.doc.docstatus !== 0) return;
-
 	const row = grid_row.doc;
 	if (!row.item_code) {
 		frappe.msgprint(__('الرجاء اختيار الصنف أولاً'));
