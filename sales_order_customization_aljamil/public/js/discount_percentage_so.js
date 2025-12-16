@@ -43,7 +43,7 @@ frappe.ui.form.on('Sales Order Item', {
     },
     item_code(frm, cdt, cdn) {
         const row = locals[cdt][cdn];
-        // عند اختيار كود الصنف، ننسخ القيمة من الحقل الرئيسي إذا موجودة وكان ظاهر
+        // When selecting item code, copy value from main field if exists and visible
         if (!frm.get_field("custom__discount_percentage").df.hidden && frm.doc.custom__discount_percentage > 0) {
             frappe.model.set_value(cdt, cdn, 'custom_discount_percentage', frm.doc.custom__discount_percentage);
             row._original_custom_discount_percentage = frm.doc.custom__discount_percentage;
@@ -52,10 +52,10 @@ frappe.ui.form.on('Sales Order Item', {
 });
 
 // =======================
-// 🔧 الدوال المساعدة
+// 🔧 Helper Functions
 // =======================
 function sync_main_discount(frm) {
-    // ✅ لو الحقل مخفي → نستخدم حد الموظف مباشرة
+    // ✅ If field is hidden → use employee limit directly
     if (frm.get_field("custom__discount_percentage").df.hidden) {
         return get_allowed_discount_limit().then(allowed => {
             frm._original_custom__discount_percentage = allowed;
@@ -118,7 +118,7 @@ function get_allowed_discount_limit(max_discount = 0) {
 }
 
 function check_main_discount(frm) {
-    // ✅ لو الحقل مخفي → نستخدم الحد مباشرة
+    // ✅ If field is hidden → use limit directly
     if (frm.get_field("custom__discount_percentage").df.hidden) {
         return get_allowed_discount_limit().then(allowed => {
             frm._original_custom__discount_percentage = allowed;
