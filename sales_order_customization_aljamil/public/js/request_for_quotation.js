@@ -6,7 +6,7 @@ frappe.ui.form.on('Sales Order', {
 
         frappe.db.get_list("Supplier", {
             filters: { custom_branch: frm.doc.branch },
-            fields: ["name", "supplier_primary_contact"] // نجلب الـ Contact الأساسي
+            fields: ["name", "supplier_primary_contact"] // Get primary Contact
         }).then(suppliers => {
             if (!suppliers || suppliers.length === 0) {
                 frappe.throw(`❌ لا يوجد موردون مرتبطون بالفرع: ${frm.doc.branch}`);
@@ -44,7 +44,7 @@ frappe.ui.form.on('Sales Order', {
                     return;
                 }
 
-                // إنشاء RFQ
+                // Create RFQ
                 frappe.call({
                     method: "frappe.client.insert",
                     args: { doc: rfq },
@@ -57,13 +57,13 @@ frappe.ui.form.on('Sales Order', {
                                 indicator: "green"
                             });
 
-                            // جلب رقم الهاتف من Contact المرتبط بالمورد
+                            // Get phone number from Contact linked to supplier
                             if (supplier.supplier_primary_contact) {
                                 frappe.db.get_doc("Contact", supplier.supplier_primary_contact)
                                     .then(contact_doc => {
                                         let phone_number = null;
 
-                                        // البحث في جدول phone_nos عن أول رقم متاح
+                                        // Search in phone_nos table for first available number
                                         if (contact_doc.phone_nos && contact_doc.phone_nos.length > 0) {
                                             phone_number = contact_doc.phone_nos[0].phone;
                                         }
