@@ -1,4 +1,4 @@
-frappe.ui.form.on('Sales Order', {
+frappe.ui.form.on('Sales Invoice', {
 	refresh(frm) {
 		console.log(
 			'KH Quick Pay: refresh on Sales Invoice',
