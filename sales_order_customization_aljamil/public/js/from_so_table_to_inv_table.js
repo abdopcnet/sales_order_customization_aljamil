@@ -10,17 +10,17 @@ frappe.ui.form.on('Sales Order', {
                     frappe.model.with_doc("Sales Invoice", route[2], () => {
                         const si = frappe.model.get_doc("Sales Invoice", route[2]);
 
-                        // --------- جدول الأصناف ---------
+                        // --------- Items Table ---------
                         if (si.items && si.items.length && frm.doc.items && frm.doc.items.length) {
                             si.items.forEach((item, idx) => {
                                 const so_item = frm.doc.items[idx];
                                 if (so_item) {
-                                    // الحقول الخاصة بالخصومات
+                                    // Discount fields
                                     frappe.model.set_value(item.doctype, item.name, "custom_discount", so_item.custom_discount || "");
                                     frappe.model.set_value(item.doctype, item.name, "custom_discount2", so_item.custom_discount2 || "");
                                     frappe.model.set_value(item.doctype, item.name, "custom_discount_percentage", so_item.custom_discount_percentage || "");
 
-                                    // الحقول الخاصة بالعدسات والمقاسات
+                                    // Lens and size fields
                                     frappe.model.set_value(item.doctype, item.name, "custom_lensmaterial", so_item.custom_lensmaterial || "");
                                     frappe.model.set_value(item.doctype, item.name, "custom_lenscolor", so_item.custom_lenscolor || "");
                                     frappe.model.set_value(item.doctype, item.name, "custom_lenscolorclip", so_item.custom_lenscolorclip || "");
@@ -36,7 +36,7 @@ frappe.ui.form.on('Sales Order', {
                             });
                         }
 
-                        // --------- جدول Custom Insurance Data ---------
+                        // --------- Custom Insurance Data Table ---------
                         if (si.custom_insurance_data && si.custom_insurance_data.length && frm.doc.custom_insurance_data && frm.doc.custom_insurance_data.length) {
                             si.custom_insurance_data.forEach((ins_item, idx) => {
                                 const so_ins = frm.doc.custom_insurance_data[idx];
