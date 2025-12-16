@@ -88,7 +88,7 @@ frappe.ui.form.on('Sales Order', {
     }
 });
 
-// الكود الأساسي (يعتمد على custom__apvd_amt2 == 1)
+// Main code (depends on custom__apvd_amt2 == 1)
 async function recalculate_insurance_amounts_v1(frm) {
     let insurance_company_name = frm.doc.custom_insurance_company;
     if (!insurance_company_name) return;
@@ -151,7 +151,7 @@ async function recalculate_insurance_amounts_v1(frm) {
     frm.set_value("custom_customer_amount", total_customer_amount);
 }
 
-// الكود البديل (يعتمد على custom__apvd_amt == 1)
+// Alternative code (depends on custom__apvd_amt == 1)
 async function recalculate_insurance_amounts_v2(frm) {
     let insurance_company_name = frm.doc.custom_insurance_company;
     if (!insurance_company_name) return;
