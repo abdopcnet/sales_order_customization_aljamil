@@ -98,12 +98,15 @@ function open_quick_payment_dialog_for_so(frm) {
 
 							let pe = r2.message;
 
-							// بيانات عامة
+							// Set mode_of_payment from dialog values
+							pe.mode_of_payment = values.mode_of_payment;
+
+							// General data
 							pe.posting_date = values.posting_date;
 							pe.reference_no = values.reference_no;
 							pe.reference_date = values.reference_date;
 
-							// نحدد مبلغ الدفع بدون ما نتجاوز الـ outstanding
+							// Set payment amount without exceeding outstanding
 							let pay_amount = flt(values.paid_amount);
 
 							if (pe.references && pe.references.length) {
@@ -121,18 +124,54 @@ function open_quick_payment_dialog_for_so(frm) {
 							pe.paid_amount = pay_amount;
 							pe.received_amount = pay_amount;
 
-							// حفظ سند الدفع
+							// Insert Payment Entry
 							frappe.call({
 								method: 'frappe.client.insert',
 								args: { doc: pe },
 								callback: function (res) {
 									if (res.message) {
-										frappe.msgprint(
-											__('تم إنشاء سند الدفع: {0}', [res.message.name]),
-										);
-										frm.reload_doc();
+										let pe_doc = res.message;
+
+										// Save Payment Entry
+										frappe.call({
+											method: 'frappe.client.save',
+											args: { doc: pe_doc },
+											callback: function (save_res) {
+												if (save_res.message) {
+													pe_doc = save_res.message;
+
+													// Submit Payment Entry
+													frappe.call({
+														method: 'frappe.client.submit',
+														args: { doc: pe_doc },
+														callback: function (submit_res) {
+															if (submit_res.message) {
+																frappe.msgprint(
+																	__(
+																		'تم إنشاء وتقديم سند الدفع: {0}',
+																		[submit_res.message.name],
+																	),
+																);
+																// Reload Sales Order after Payment Entry is saved and submitted
+																frm.reload_doc();
+															} else {
+																frappe.msgprint(
+																	__(
+																		'حدث خطأ أثناء تقديم سند الدفع.',
+																	),
+																);
+															}
+														},
+													});
+												} else {
+													frappe.msgprint(
+														__('حدث خطأ أثناء حفظ سند الدفع.'),
+													);
+												}
+											},
+										});
 									} else {
-										frappe.msgprint(__('حدث خطأ أثناء حفظ سند الدفع.'));
+										frappe.msgprint(__('حدث خطأ أثناء إنشاء سند الدفع.'));
 									}
 								},
 							});
