@@ -1,4 +1,4 @@
-// منع التسجيل فقط إذا لم تتوفر الكميات بالكامل
+// Prevent submit only if quantities are not fully available
 frappe.ui.form.on('Sales Order', {
     before_submit(frm) {
         if (frm.doc.custom_items_available !== 100) {
