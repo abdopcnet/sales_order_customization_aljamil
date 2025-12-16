@@ -15,7 +15,7 @@ frappe.ui.form.on('Sales Order', {
                     let conflict_found = false;
 
                     for (let so_row of frm.doc.custom_size) {
-                        // نتجاهل التعارض إذا كان تاريخ الصف مساويًا لتاريخ البحث
+                        // Ignore conflict if row date equals search date
                         let is_from_search = frm.doc.custom_date && (so_row.date === frm.doc.custom_date);
 
                         if (!is_from_search) {
@@ -31,7 +31,7 @@ frappe.ui.form.on('Sales Order', {
                                 });
                                 frappe.validated = false;
                                 conflict_found = true;
-                                break; // إيقاف التكرار
+                                break; // Stop iteration
                             }
                         }
 
@@ -59,7 +59,7 @@ frappe.ui.form.on('Sales Order', {
                         }
                     }
 
-                    // إذا لم يوجد تعارض، نقوم بالحفظ في سجل العميل
+                    // If no conflict, save to customer record
                     if (!conflict_found) {
                         return frappe.call({
                             method: "frappe.client.set_value",
