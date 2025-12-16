@@ -1,9 +1,9 @@
 // =======================
-// ✅ Sales Order - تحديث تلقائي لحظي + حفظ أسرع
+// ✅ Sales Order - Real-time auto update + faster save
 // =======================
-const POLL_INTERVAL_MS = 1000;   // ⏱ تردد الفحص (1 ثانية فقط)
-const AUTO_SAVE = true;          // تفعيل الحفظ التلقائي
-const SAVE_DEBOUNCE_MS = 200;    // زمن الانتظار قبل الحفظ (جزء من الثانية فقط)
+const POLL_INTERVAL_MS = 1000;   // ⏱ Poll frequency (1 second only)
+const AUTO_SAVE = true;          // Enable auto save
+const SAVE_DEBOUNCE_MS = 200;    // Wait time before save (fraction of a second only)
 
 frappe.ui.form.on('Sales Order', {
     onload(frm) {
@@ -39,9 +39,9 @@ frappe.ui.form.on('Sales Order', {
         stop_availability_poll(frm);
     },
 
-    // تحديث مباشر آمن عند تغيير الحقل
+    // Safe direct update when field changes
     custom_items_available: function(frm) {
-        // ممنوع الحفظ بعد الـ Submit
+        // Save not allowed after Submit
         if (frm.doc.docstatus !== 0) return;
 
         frm.set_value('custom_items_available', frm.doc.custom_items_available);
@@ -183,7 +183,7 @@ function apply_percentage_ui_and_field(frm, percentage) {
         });
     }
 
-    // ❌ لا تحدث القيمة بعد الـ Submit
+    // ❌ Do not update value after Submit
     if (frm.doc.docstatus !== 0) return;
 
     let current_val = parseInt(frm.doc.custom_items_available || 0);
@@ -199,7 +199,7 @@ function apply_percentage_ui_and_field(frm, percentage) {
 
 // ======= Fallback DB update =======
 function fallback_db_update(frm) {
-    if (frm.doc.docstatus !== 0) return; // ❌ لا تحفظ بعد الـ Submit
+    if (frm.doc.docstatus !== 0) return; // ❌ Do not save after Submit
     frappe.call({
         method: 'frappe.client.set_value',
         args: {
