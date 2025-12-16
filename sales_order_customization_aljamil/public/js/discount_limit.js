@@ -54,10 +54,10 @@ frappe.ui.form.on('Sales Order', {
                 if (entered > allowed_limit) {
                     let rollback_to = Number(row._original_custom_discount_percentage) || 0;
 
-                    // إعادة القيمة الأصلية
+                    // Restore original value
                     row.custom_discount_percentage = rollback_to;
 
-                    // منع الحفظ
+                    // Prevent save
                     throw frappe.throw({
                         title: __('خصم غير مسموح'),
                         message: __('🚫 نسبة الخصم لا يمكن أن تتجاوز الحد ({0}%)', [allowed_limit]),
@@ -138,7 +138,7 @@ frappe.ui.form.on('Sales Order Item', {
                             });
                         }
                     } else {
-                        // حفظ القيمة الأصلية
+                        // Save original value
                         frappe.model.set_value(cdt, cdn, '_original_custom_discount_percentage', entered);
                         frm._discount_msg_shown = false;
                         frm._no_item_code_msg = false;
