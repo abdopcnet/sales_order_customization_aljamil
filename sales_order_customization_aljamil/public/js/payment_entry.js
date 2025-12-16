@@ -101,6 +101,11 @@ function open_quick_payment_dialog_for_so(frm) {
 							// Set mode_of_payment from dialog values
 							pe.mode_of_payment = values.mode_of_payment;
 
+							// Copy branch from Sales Order to Payment Entry
+							if (frm.doc.branch) {
+								pe.branch = frm.doc.branch;
+							}
+
 							// General data
 							pe.posting_date = values.posting_date;
 							pe.reference_no = values.reference_no;
