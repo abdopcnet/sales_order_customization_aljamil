@@ -39,7 +39,7 @@ function open_quick_payment_dialog_for_so(frm) {
 				fieldtype: 'Currency',
 				label: __('Paid Amount'),
 				reqd: 1,
-				default: frm.doc.grand_total || 0,
+				default: frm.doc.outstanding_amount || 0,
 			},
 			{
 				fieldname: 'reference_no',
@@ -54,138 +54,106 @@ function open_quick_payment_dialog_for_so(frm) {
 			},
 		],
 		primary_action_label: __('إنشاء سند دفع'),
-		primary_action(values) {
+		primary_action: async function (values) {
 			if (!values.paid_amount || flt(values.paid_amount) <= 0) {
 				frappe.msgprint(__('الرجاء إدخال مبلغ دفع صحيح.'));
 				return;
 			}
 
-			// Get Mode of Payment type (Bank / Cash / ... )
-			frappe.call({
-				method: 'frappe.client.get_value',
-				args: {
-					doctype: 'Mode of Payment',
-					filters: { name: values.mode_of_payment },
-					fieldname: ['type'],
-				},
-				callback: function (r) {
-					const mop_type = r.message ? r.message.type : null;
+			try {
+				const pe_res = await frappe.call({
+					method: 'erpnext.accounts.doctype.payment_entry.payment_entry.get_payment_entry',
+					args: {
+						dt: frm.doc.doctype,
+						dn: frm.doc.name,
+					},
+				});
 
-					// If Bank and reference or date is missing -> fill them automatically
-					if (mop_type === 'Bank') {
-						if (!values.reference_date) {
-							values.reference_date = frappe.datetime.get_today();
-						}
-						if (!values.reference_no) {
-							// Auto reference number
-							values.reference_no = 'AUTO-' + frm.doc.name;
-						}
+				if (!pe_res.message) {
+					frappe.msgprint(__('تعذر إنشاء سند الدفع.'));
+					return;
+				}
+
+				let pe = pe_res.message;
+				pe.mode_of_payment = values.mode_of_payment;
+
+				if (frm.doc.branch) {
+					pe.branch = frm.doc.branch;
+				}
+
+				pe.posting_date = values.posting_date;
+				pe.reference_no = values.reference_no;
+				pe.reference_date = values.reference_date;
+
+				// 4. Calculate payment amount and validate against outstanding
+				let pay_amount = flt(values.paid_amount);
+				if (pe.references && pe.references.length) {
+					let ref = pe.references[0];
+					let outstanding = flt(ref.outstanding_amount) || flt(ref.total_amount) || 0;
+					if (outstanding && pay_amount > outstanding) {
+						pay_amount = outstanding;
 					}
+					ref.allocated_amount = pay_amount;
+				}
 
-					// Call get_payment_entry without party_amount
+				// 5. Set payment amounts
+				pe.paid_amount = pay_amount;
+				pe.received_amount = pay_amount;
+
+				// 6. Get default account from Mode of Payment for the company
+				await new Promise((resolve, reject) => {
 					frappe.call({
-						method: 'erpnext.accounts.doctype.payment_entry.payment_entry.get_payment_entry',
+						method: 'frappe.client.get_value',
 						args: {
-							dt: frm.doc.doctype, // "Sales Order"
-							dn: frm.doc.name,
-							mode_of_payment: values.mode_of_payment,
+							doctype: 'Mode of Payment Account',
+							filters: {
+								parent: values.mode_of_payment,
+								company: frm.doc.company,
+							},
+							fieldname: 'default_account',
 						},
-						callback: function (r2) {
-							if (!r2.message) {
-								frappe.msgprint(__('تعذر إنشاء سند الدفع.'));
-								return;
+						callback: function (r) {
+							if (r.message && r.message.default_account) {
+								let payment_account_field =
+									pe.payment_type == 'Receive' ? 'paid_to' : 'paid_from';
+								pe[payment_account_field] = r.message.default_account;
+								resolve();
+							} else {
+								reject(new Error('لم يتم العثور على حساب افتراضي لطريقة الدفع'));
 							}
-
-							let pe = r2.message;
-
-							// Set mode_of_payment from dialog values
-							pe.mode_of_payment = values.mode_of_payment;
-
-							// Copy branch from Sales Order to Payment Entry
-							if (frm.doc.branch) {
-								pe.branch = frm.doc.branch;
-							}
-
-							// General data
-							pe.posting_date = values.posting_date;
-							pe.reference_no = values.reference_no;
-							pe.reference_date = values.reference_date;
-
-							// Set payment amount without exceeding outstanding
-							let pay_amount = flt(values.paid_amount);
-
-							if (pe.references && pe.references.length) {
-								let ref = pe.references[0];
-								let outstanding =
-									flt(ref.outstanding_amount) || flt(ref.total_amount) || 0;
-
-								if (outstanding && pay_amount > outstanding) {
-									pay_amount = outstanding;
-								}
-
-								ref.allocated_amount = pay_amount;
-							}
-
-							pe.paid_amount = pay_amount;
-							pe.received_amount = pay_amount;
-
-							// Insert Payment Entry
-							frappe.call({
-								method: 'frappe.client.insert',
-								args: { doc: pe },
-								callback: function (res) {
-									if (res.message) {
-										let pe_doc = res.message;
-
-										// Save Payment Entry
-										frappe.call({
-											method: 'frappe.client.save',
-											args: { doc: pe_doc },
-											callback: function (save_res) {
-												if (save_res.message) {
-													pe_doc = save_res.message;
-
-													// Submit Payment Entry
-													frappe.call({
-														method: 'frappe.client.submit',
-														args: { doc: pe_doc },
-														callback: function (submit_res) {
-															if (submit_res.message) {
-																frappe.msgprint(
-																	__(
-																		'تم إنشاء وتقديم سند الدفع: {0}',
-																		[submit_res.message.name],
-																	),
-																);
-																// Reload Sales Order after Payment Entry is saved and submitted
-																frm.reload_doc();
-															} else {
-																frappe.msgprint(
-																	__(
-																		'حدث خطأ أثناء تقديم سند الدفع.',
-																	),
-																);
-															}
-														},
-													});
-												} else {
-													frappe.msgprint(
-														__('حدث خطأ أثناء حفظ سند الدفع.'),
-													);
-												}
-											},
-										});
-									} else {
-										frappe.msgprint(__('حدث خطأ أثناء إنشاء سند الدفع.'));
-									}
-								},
-							});
 						},
 					});
-				},
-			});
+				});
 
-			d.hide();
+				// 7. Insert the payment entry document
+				const insert_res = await frappe.call({
+					method: 'frappe.client.insert',
+					args: { doc: pe },
+				});
+
+				if (!insert_res.message) {
+					frappe.msgprint(__('حدث خطأ أثناء إنشاء سند الدفع.'));
+					return;
+				}
+
+				// 8. Submit the payment entry
+				const submit_res = await frappe.call({
+					method: 'frappe.client.submit',
+					args: { doc: insert_res.message },
+				});
+
+				if (submit_res.message) {
+					frappe.msgprint(
+						__('تم إنشاء وتقديم سند الدفع: {0}', [submit_res.message.name]),
+					);
+					frm.reload_doc();
+					d.hide();
+				} else {
+					frappe.msgprint(__('حدث خطأ أثناء تقديم سند الدفع.'));
+				}
+			} catch (e) {
+				frappe.msgprint(__('حدث خطأ أثناء إنشاء سند الدفع.'));
+			}
 		},
 	});
 
