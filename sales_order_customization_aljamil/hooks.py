@@ -49,7 +49,7 @@ doctype_js = {
         "public/js/sales_order.js",
     ],
     "Sales Invoice": [
-        "public/js/payment_entry_sales_invoice.js",
+        "public/js/sales_invoice.js",
     ]
 }
 
