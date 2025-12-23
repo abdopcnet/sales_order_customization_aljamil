@@ -613,9 +613,6 @@ frappe.ui.form.on('Sales Order', {
 });
 
 frappe.ui.form.on('Sales Order Item', {
-	custom_discount_percentage(frm, cdt, cdn) {
-		validate_discount_field(frm, cdt, cdn);
-	},
 	item_code(frm, cdt, cdn) {
 		const row = locals[cdt][cdn];
 		// When selecting item code, copy value from main field if exists and visible
@@ -697,9 +694,7 @@ function validate_discount_field(frm, cdt, cdn) {
 							'custom_discount_percentage',
 							row._original_custom_discount_percentage || 0,
 						);
-						frappe.msgprint(
-							__('🚫 نسبة الخصم لا يمكن أن تتجاوز الحد ({0}%)', [allowed]),
-						);
+						// Message is shown in the main custom_discount_percentage handler to avoid duplication
 					} else {
 						row._original_custom_discount_percentage = entered;
 					}
@@ -787,24 +782,84 @@ frappe.ui.form.on('Sales Order', {
 				);
 
 				const max_discount = Number(price.message?.custom_discount_percent) || 0;
-
-				const res = await frappe.call({
-					method: 'frappe.client.get_list',
-					args: {
-						doctype: 'Employee',
-						filters: {
-							user_id: frappe.session.user,
-							status: 'Active',
-						},
-						fields: ['custom_discount_percentage_limit'],
-						limit_page_length: 1,
-					},
+				console.log('🔍 [Discount Debug - VALIDATE] Item Price discount:', {
+					item_code: row.item_code,
+					price_list: frm.doc.selling_price_list,
+					max_discount_from_item_price: max_discount,
+					item_price_data: price.message,
 				});
 
-				const employee_limit =
-					Number(res.message?.[0]?.custom_discount_percentage_limit) || 0;
+				// Get Employee from Sales Person instead of user_id
+				let employee_limit = 0;
+				if (frm.doc.custom_sales_person) {
+					console.log('🔍 [Discount Debug - VALIDATE] Sales Person found:', {
+						custom_sales_person: frm.doc.custom_sales_person,
+					});
+					const sales_person = await frappe.db.get_value(
+						'Sales Person',
+						frm.doc.custom_sales_person,
+						'employee',
+					);
+					console.log('🔍 [Discount Debug - VALIDATE] Sales Person data:', {
+						sales_person_name: frm.doc.custom_sales_person,
+						employee_from_sales_person: sales_person.message?.employee,
+						sales_person_data: sales_person.message,
+					});
+					if (sales_person.message?.employee) {
+						const employee = await frappe.db.get_value(
+							'Employee',
+							sales_person.message.employee,
+							'custom_discount_percentage_limit',
+						);
+						employee_limit =
+							Number(employee.message?.custom_discount_percentage_limit) || 0;
+						console.log('🔍 [Discount Debug - VALIDATE] Employee from Sales Person:', {
+							employee_limit: employee_limit,
+							employee_data: employee.message,
+						});
+					}
+				}
+
+				// Fallback to user's employee if no sales person
+				if (!employee_limit) {
+					console.log('🔍 [Discount Debug - VALIDATE] Using fallback (user employee):', {
+						user: frappe.session.user,
+						reason: 'No employee limit from Sales Person',
+					});
+					const res = await frappe.call({
+						method: 'frappe.client.get_list',
+						args: {
+							doctype: 'Employee',
+							filters: {
+								user_id: frappe.session.user,
+								status: 'Active',
+							},
+							fields: ['custom_discount_percentage_limit'],
+							limit_page_length: 1,
+						},
+					});
+					employee_limit =
+						Number(res.message?.[0]?.custom_discount_percentage_limit) || 0;
+					console.log('🔍 [Discount Debug - VALIDATE] Fallback employee data:', {
+						employee_limit: employee_limit,
+						employee_data: res.message?.[0],
+					});
+				} else {
+					console.log(
+						'🔍 [Discount Debug - VALIDATE] Using Sales Person employee limit',
+					);
+				}
+
 				const allowed_limit = Math.max(max_discount, employee_limit);
 				const entered = Number(row.custom_discount_percentage) || 0;
+
+				console.log('🔍 [Discount Debug - VALIDATE] Final calculation:', {
+					max_discount_from_item_price: max_discount,
+					employee_limit: employee_limit,
+					allowed_limit: allowed_limit,
+					entered_discount: entered,
+					calculation: `Math.max(${max_discount}, ${employee_limit}) = ${allowed_limit}`,
+				});
 
 				if (entered > allowed_limit) {
 					let rollback_to = Number(row._original_custom_discount_percentage) || 0;
@@ -870,57 +925,165 @@ frappe.ui.form.on('Sales Order Item', {
 			)
 			.then((r) => {
 				const max_discount = Number(r.message?.custom_discount_percent) || 0;
-
-				frappe.call({
-					method: 'frappe.client.get_list',
-					args: {
-						doctype: 'Employee',
-						filters: {
-							user_id: frappe.session.user,
-							status: 'Active',
-						},
-						fields: ['custom_discount_percentage_limit'],
-						limit_page_length: 1,
-					},
-					callback(res) {
-						const employee_limit =
-							Number(res.message?.[0]?.custom_discount_percentage_limit) || 0;
-						const allowed_limit = Math.max(max_discount, employee_limit);
-
-						if (entered > allowed_limit) {
-							const rollback_to =
-								Number(row._original_custom_discount_percentage) || 0;
-
-							frappe.model.set_value(
-								cdt,
-								cdn,
-								'custom_discount_percentage',
-								rollback_to,
-							);
-
-							if (!frm._discount_msg_shown) {
-								frm._discount_msg_shown = true;
-								frappe.msgprint({
-									title: __('خصم غير مسموح'),
-									message: __('🚫 نسبة الخصم لا يمكن أن تتجاوز الحد ({0}%)', [
-										allowed_limit,
-									]),
-									indicator: 'red',
-								});
-							}
-						} else {
-							// Save original value
-							frappe.model.set_value(
-								cdt,
-								cdn,
-								'_original_custom_discount_percentage',
-								entered,
-							);
-							frm._discount_msg_shown = false;
-							frm._no_item_code_msg = false;
-						}
-					},
+				console.log('🔍 [Discount Debug] Item Price discount:', {
+					item_code: row.item_code,
+					price_list: frm.doc.selling_price_list,
+					max_discount_from_item_price: max_discount,
+					item_price_data: r.message,
 				});
+
+				// Helper function to process discount validation
+				function processDiscountValidation(max_discount, employee_limit) {
+					const allowed_limit = Math.max(max_discount, employee_limit);
+					const entered = Number(row.custom_discount_percentage) || 0;
+
+					console.log('🔍 [Discount Debug] Final calculation:', {
+						max_discount_from_item_price: max_discount,
+						employee_limit: employee_limit,
+						allowed_limit: allowed_limit,
+						entered_discount: entered,
+						calculation: `Math.max(${max_discount}, ${employee_limit}) = ${allowed_limit}`,
+					});
+
+					if (entered > allowed_limit) {
+						const rollback_to = Number(row._original_custom_discount_percentage) || 0;
+
+						frappe.model.set_value(
+							cdt,
+							cdn,
+							'custom_discount_percentage',
+							rollback_to,
+						);
+
+						if (!frm._discount_msg_shown) {
+							frm._discount_msg_shown = true;
+							frappe.msgprint({
+								title: __('خصم غير مسموح'),
+								message: __('🚫 نسبة الخصم لا يمكن أن تتجاوز الحد ({0}%)', [
+									allowed_limit,
+								]),
+								indicator: 'red',
+							});
+						}
+					} else {
+						// Save original value
+						frappe.model.set_value(
+							cdt,
+							cdn,
+							'_original_custom_discount_percentage',
+							entered,
+						);
+						frm._discount_msg_shown = false;
+						frm._no_item_code_msg = false;
+					}
+				}
+
+				// Get Employee from Sales Person instead of user_id
+				if (frm.doc.custom_sales_person) {
+					console.log('🔍 [Discount Debug] Sales Person found:', {
+						custom_sales_person: frm.doc.custom_sales_person,
+					});
+					// First get employee from Sales Person
+					frappe.db
+						.get_value('Sales Person', frm.doc.custom_sales_person, 'employee')
+						.then((sales_person) => {
+							console.log('🔍 [Discount Debug] Sales Person data:', {
+								sales_person_name: frm.doc.custom_sales_person,
+								employee_from_sales_person: sales_person.message?.employee,
+								sales_person_data: sales_person.message,
+							});
+							if (sales_person.message?.employee) {
+								return frappe.db.get_value(
+									'Employee',
+									sales_person.message.employee,
+									'custom_discount_percentage_limit',
+								);
+							}
+							return null;
+						})
+						.then((employee) => {
+							let employee_limit = 0;
+							if (employee && employee.message?.custom_discount_percentage_limit) {
+								employee_limit =
+									Number(employee.message.custom_discount_percentage_limit) || 0;
+							}
+							console.log('🔍 [Discount Debug] Employee from Sales Person:', {
+								employee_limit: employee_limit,
+								employee_data: employee?.message,
+							});
+
+							// Fallback to user's employee if no sales person or no limit
+							if (!employee_limit) {
+								console.log(
+									'🔍 [Discount Debug] Using fallback (user employee):',
+									{
+										user: frappe.session.user,
+										reason: 'No employee limit from Sales Person',
+									},
+								);
+								frappe.call({
+									method: 'frappe.client.get_list',
+									args: {
+										doctype: 'Employee',
+										filters: {
+											user_id: frappe.session.user,
+											status: 'Active',
+										},
+										fields: ['custom_discount_percentage_limit'],
+										limit_page_length: 1,
+									},
+									callback(res) {
+										const fallback_limit =
+											Number(
+												res.message?.[0]?.custom_discount_percentage_limit,
+											) || 0;
+										console.log(
+											'🔍 [Discount Debug] Fallback employee data:',
+											{
+												fallback_limit: fallback_limit,
+												employee_data: res.message?.[0],
+											},
+										);
+										processDiscountValidation(
+											max_discount,
+											fallback_limit || employee_limit,
+										);
+									},
+								});
+							} else {
+								console.log(
+									'🔍 [Discount Debug] Using Sales Person employee limit',
+								);
+								processDiscountValidation(max_discount, employee_limit);
+							}
+						});
+				} else {
+					// No sales person, use user's employee
+					console.log('🔍 [Discount Debug] No Sales Person, using user employee:', {
+						user: frappe.session.user,
+					});
+					frappe.call({
+						method: 'frappe.client.get_list',
+						args: {
+							doctype: 'Employee',
+							filters: {
+								user_id: frappe.session.user,
+								status: 'Active',
+							},
+							fields: ['custom_discount_percentage_limit'],
+							limit_page_length: 1,
+						},
+						callback(res) {
+							const employee_limit =
+								Number(res.message?.[0]?.custom_discount_percentage_limit) || 0;
+							console.log('🔍 [Discount Debug] User employee data:', {
+								employee_limit: employee_limit,
+								employee_data: res.message?.[0],
+							});
+							processDiscountValidation(max_discount, employee_limit);
+						},
+					});
+				}
 			});
 	},
 
