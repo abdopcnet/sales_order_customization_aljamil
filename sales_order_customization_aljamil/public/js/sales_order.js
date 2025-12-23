@@ -967,17 +967,31 @@ frappe.ui.form.on('Sales Order', {
 		});
 
 		if (!frm.employee) {
-			const grid = frm.fields_dict.items?.grid;
-			if (grid) {
-				const df = grid.get_field('custom_discount');
-				if (df && df.df) {
-					df.df.read_only = 1; // Prevent editing from UI
-					df.refresh();
-				} else {
-					console.warn('الحقل custom_discount غير موجود في جدول items');
-				}
-			} else {
-				console.warn('الجدول items غير جاهز بعد');
+			// Use set_df_property to set read_only for child table field
+			// Parameters: fieldname, property, value, docname (child doctype), table_field, table_row_name
+			try {
+				frm.set_df_property(
+					'items',
+					'read_only',
+					1,
+					'Sales Order Item',
+					'custom_discount',
+				);
+			} catch (e) {
+				// Field might not be loaded yet, ignore error silently
+			}
+		} else {
+			// Make field editable if employee exists
+			try {
+				frm.set_df_property(
+					'items',
+					'read_only',
+					0,
+					'Sales Order Item',
+					'custom_discount',
+				);
+			} catch (e) {
+				// Field might not be loaded yet, ignore error silently
 			}
 		}
 	},
