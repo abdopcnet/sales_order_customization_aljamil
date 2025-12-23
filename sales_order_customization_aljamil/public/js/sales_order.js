@@ -287,7 +287,7 @@ function fallback_db_update(frm) {
 // File 4: available_qty.js
 // ============================================
 // =======================
-// Sales Order - Use projected_qty instead of custom_available_qty
+// Sales Order - Use projected_qty to show available qty
 // projected_qty = actual_qty + ordered_qty + indented_qty + planned_qty - reserved_qty - ...
 // =======================
 
@@ -770,13 +770,14 @@ function generateRandomCode(length) {
 }
 
 frappe.ui.form.on('Sales Order Item', {
-	custom_discount: update_discount,
-	custom_discount2: update_discount,
-	custom_discount_percentage: update_discount,
-	price_list_rate: update_discount,
+	custom_discount: update_discount_simple,
+	custom_discount2: update_discount_simple,
+	custom_discount_percentage: update_discount_simple,
+	price_list_rate: update_discount_simple,
 });
 
-function update_discount(frm, cdt, cdn) {
+// Function from discount.js - Simple discount calculation (without dividing by qty)
+function update_discount_simple(frm, cdt, cdn) {
 	let row = locals[cdt][cdn];
 
 	// Calculate discount percentage from price
@@ -3761,6 +3762,95 @@ frappe.ui.form.on('Sales Order', {
 	},
 });
 
+// ============================================
+// Discount Percentage Validation Before Save
+// ============================================
+frappe.ui.form.on('Sales Order', {
+	before_save: async function (frm) {
+		// Check discount percentage for all items before save
+		if (!frm.doc.items || frm.doc.items.length === 0) return;
+		if (!frm.doc.selling_price_list) return;
+
+		const validation_promises = frm.doc.items.map(async (row) => {
+			if (!row.item_code) return null;
+
+			try {
+				// Get item max discount from Item Price
+				const item_price = await frappe.db.get_value(
+					'Item Price',
+					{
+						item_code: row.item_code,
+						price_list: frm.doc.selling_price_list,
+					},
+					'custom_discount_percent',
+				);
+
+				const max_discount = +item_price.message?.custom_discount_percent || 0;
+
+				// Get employee discount limit
+				const employee_res = await frappe.call({
+					method: 'frappe.client.get_list',
+					args: {
+						doctype: 'Employee',
+						filters: {
+							user_id: frappe.session.user,
+							status: 'Active',
+						},
+						fields: ['custom_discount_percentage_limit'],
+						limit_page_length: 1,
+					},
+				});
+
+				const employee_limit =
+					+employee_res.message?.[0]?.custom_discount_percentage_limit || 0;
+				const allowed_limit = Math.max(max_discount, employee_limit);
+
+				// Check if entered discount exceeds allowed limit
+				const entered_discount = +row.custom_discount_percentage || 0;
+
+				if (entered_discount > allowed_limit) {
+					return {
+						item_code: row.item_code,
+						entered: entered_discount,
+						allowed: allowed_limit,
+					};
+				}
+			} catch (error) {
+				console.error('Error validating discount for item:', row.item_code, error);
+			}
+
+			return null;
+		});
+
+		const validation_results = await Promise.all(validation_promises);
+		const errors = validation_results.filter((r) => r !== null);
+
+		if (errors.length > 0) {
+			// Show immediate message before save for each item
+			const error_messages = errors.map((err) => {
+				return __('الصنف {0}: نسبة الخصم المدخلة ({1}%) - المسموح ({2}%)', [
+					err.item_code,
+					err.entered,
+					err.allowed,
+				]);
+			});
+
+			// Show message for each item with its allowed limit
+			errors.forEach((err) => {
+				frappe.msgprint({
+					title: __('تحذير: نسبة الخصم تتجاوز المسموح'),
+					message: __('عفوا إجمالي نسبة الخصم المسموحه هي {0}%', [err.allowed]),
+					indicator: 'red',
+				});
+			});
+
+			// Prevent save
+			frappe.validated = false;
+			throw new Error(__('لا يمكن الحفظ: نسبة الخصم تتجاوز المسموح'));
+		}
+	},
+});
+
 // Main code (depends on custom__apvd_amt2 == 1)
 async function recalculate_insurance_amounts_v1(frm) {
 	let insurance_company_name = frm.doc.custom_insurance_company;
@@ -4346,23 +4436,20 @@ frappe.ui.form.on('Sales Order', {
 // =======================
 frappe.ui.form.on('Sales Order', {
 	onload_post_render(frm) {
-		if (frm.doc.docstatus === 0) {
-			init_strict_colors(frm);
-		}
+		// Apply colors for all document statuses (draft, submitted, cancelled)
+		init_strict_colors(frm);
 	},
 	refresh(frm) {
-		if (frm.doc.docstatus === 0) {
-			frappe.after_ajax(() => {
-				setTimeout(() => {
-					init_strict_colors(frm);
-				}, 100);
-			});
-		}
+		// Apply colors for all document statuses (draft, submitted, cancelled)
+		frappe.after_ajax(() => {
+			setTimeout(() => {
+				init_strict_colors(frm);
+			}, 100);
+		});
 	},
 	before_save(frm) {
-		if (frm.doc.docstatus === 0) {
-			apply_strict_colors(frm);
-		}
+		// Apply colors for all document statuses (draft, submitted, cancelled)
+		apply_strict_colors(frm);
 	},
 });
 
@@ -4379,15 +4466,14 @@ function init_strict_colors(frm) {
 		// Use frm.wrapper for grid-row-render event (Frappe framework standard)
 		$(frm.wrapper).on('grid-row-render', function (e, grid_row) {
 			// Only process rows from items grid
+			// Apply colors for all document statuses (draft, submitted, cancelled)
 			if (
 				grid_row &&
 				grid_row.grid &&
 				grid_row.grid.df &&
 				grid_row.grid.df.fieldname === 'items'
 			) {
-				if (frm.doc.docstatus === 0) {
-					color_single_row(grid_row);
-				}
+				color_single_row(grid_row);
 			}
 		});
 	}
@@ -4398,7 +4484,7 @@ function init_strict_colors(frm) {
 // Iterates through all existing rows and applies color coding
 // =======================
 function apply_strict_colors(frm) {
-	// Removed docstatus check to allow script to run even when docstatus is 0
+	// Apply colors for all document statuses (draft, submitted, cancelled)
 	inject_strict_css();
 
 	if (frm.fields_dict['items']) {
@@ -4714,19 +4800,20 @@ function create_stock_entry(frm, row, from_warehouse, dialog) {
 // =======================
 // Sales Order Item field change handlers
 // Triggers color refresh when item fields are changed
+// Apply colors for all document statuses (draft, submitted, cancelled)
 // =======================
 frappe.ui.form.on('Sales Order Item', {
 	item_code: function (frm, cdt, cdn) {
-		if (frm.doc.docstatus === 0) setTimeout(() => apply_strict_colors(frm), 200);
+		setTimeout(() => apply_strict_colors(frm), 200);
 	},
 	warehouse: function (frm, cdt, cdn) {
-		if (frm.doc.docstatus === 0) setTimeout(() => apply_strict_colors(frm), 200);
+		setTimeout(() => apply_strict_colors(frm), 200);
 	},
 	projected_qty: function (frm, cdt, cdn) {
-		if (frm.doc.docstatus === 0) apply_strict_colors(frm);
+		apply_strict_colors(frm);
 	},
 	qty: function (frm, cdt, cdn) {
-		if (frm.doc.docstatus === 0) setTimeout(() => apply_strict_colors(frm), 200);
+		setTimeout(() => apply_strict_colors(frm), 200);
 	},
 });
 
@@ -4744,24 +4831,24 @@ frappe.ui.form.on('Sales Order', {
 // Update when any values change in items table
 frappe.ui.form.on('Sales Order Item', {
 	custom_discount: function (frm, cdt, cdn) {
-		update_discount(frm, cdt, cdn);
+		update_discount_detailed(frm, cdt, cdn);
 	},
 	custom_discount_percentage: function (frm, cdt, cdn) {
-		update_discount(frm, cdt, cdn);
+		update_discount_detailed(frm, cdt, cdn);
 	},
 	custom_discount2: function (frm, cdt, cdn) {
-		update_discount(frm, cdt, cdn);
+		update_discount_detailed(frm, cdt, cdn);
 	},
 	price_list_rate: function (frm, cdt, cdn) {
-		update_discount(frm, cdt, cdn);
+		update_discount_detailed(frm, cdt, cdn);
 	},
 	qty: function (frm, cdt, cdn) {
-		update_discount(frm, cdt, cdn);
+		update_discount_detailed(frm, cdt, cdn);
 	},
 });
 
-// Function responsible for calculation
-function update_discount(frm, cdt, cdn) {
+// Function from tolal_items_discount.js - Detailed discount calculation (divides by qty)
+function update_discount_detailed(frm, cdt, cdn) {
 	let row = locals[cdt][cdn];
 
 	// First discount (custom_discount ÷ qty)
