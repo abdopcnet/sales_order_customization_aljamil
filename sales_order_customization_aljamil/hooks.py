@@ -148,13 +148,11 @@ doctype_js = {
 # ---------------
 # Hook on document methods and events
 
-# doc_events = {
-# 	"*": {
-# 		"on_update": "method",
-# 		"on_cancel": "method",
-# 		"on_trash": "method"
-# 	}
-# }
+doc_events = {
+    "Sales Order": {
+        "before_save": "sales_order_customization_aljamil.sales_order.send_discount_approval_notifications",
+    }
+}
 
 # Scheduled Tasks
 # ---------------
